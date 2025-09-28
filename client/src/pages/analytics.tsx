@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useLanguage } from "@/hooks/use-language";
 import { getTranslation } from "@/lib/translations";
@@ -22,7 +22,7 @@ interface AnalyticsData {
 
 export default function Analytics() {
   const { language } = useLanguage();
-  const [charts, setCharts] = useState<any>({});
+  const chartsRef = useRef<{ pie?: any; bar?: any }>({});
 
   const { data: analyticsData, isLoading } = useQuery<{ success: boolean; data: AnalyticsData }>({
     queryKey: ['/api/analytics'],
@@ -32,6 +32,17 @@ export default function Analytics() {
     if (analyticsData?.data && typeof window !== 'undefined') {
       initializeCharts(analyticsData.data);
     }
+    
+    // Cleanup function to destroy charts when component unmounts or data changes
+    return () => {
+      if (chartsRef.current.pie) {
+        chartsRef.current.pie.destroy();
+      }
+      if (chartsRef.current.bar) {
+        chartsRef.current.bar.destroy();
+      }
+      chartsRef.current = {};
+    };
   }, [analyticsData]);
 
   const initializeCharts = async (data: AnalyticsData) => {
@@ -40,7 +51,7 @@ export default function Analytics() {
 
     // Pie Chart for overall statistics
     const pieCtx = document.getElementById('pieChart') as HTMLCanvasElement;
-    if (pieCtx && !charts.pie) {
+    if (pieCtx && !chartsRef.current.pie) {
       const pieChart = new Chart(pieCtx, {
         type: 'pie',
         data: {
@@ -68,12 +79,12 @@ export default function Analytics() {
           }
         }
       });
-      setCharts((prev: any) => ({ ...prev, pie: pieChart }));
+      chartsRef.current.pie = pieChart;
     }
 
     // Bar Chart for regional breakdown
     const barCtx = document.getElementById('barChart') as HTMLCanvasElement;
-    if (barCtx && !charts.bar) {
+    if (barCtx && !chartsRef.current.bar) {
       const regions = Object.keys(data.regional);
       const enabledData = regions.map(region => data.regional[region].enabled);
       const notEnabledData = regions.map(region => data.regional[region].notEnabled);
@@ -117,7 +128,7 @@ export default function Analytics() {
           }
         }
       });
-      setCharts((prev: any) => ({ ...prev, bar: barChart }));
+      chartsRef.current.bar = barChart;
     }
   };
 

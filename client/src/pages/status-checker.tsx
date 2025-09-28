@@ -7,6 +7,7 @@ import { useLanguage } from "@/hooks/use-language";
 import { getTranslation } from "@/lib/translations";
 import { useMutation } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 import { Loader2 } from "lucide-react";
 
 interface StatusResult {
@@ -27,27 +28,20 @@ export default function StatusChecker() {
 
   const checkStatusMutation = useMutation({
     mutationFn: async (aadhaarNumber: string) => {
-      // Use fetch directly to handle 404 properly, instead of apiRequest which throws on non-200
-      const response = await fetch('/api/aadhaar/check', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ aadhaar: aadhaarNumber })
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        if (response.status === 404) {
-          // Handle 404 as a valid "not found" result
+      try {
+        const response = await apiRequest('POST', '/api/aadhaar/check', { aadhaar: aadhaarNumber });
+        return response.json();
+      } catch (error: any) {
+        // Handle 404 as a valid "not found" result
+        if (error.message?.includes('404')) {
           return {
             success: false,
             status: "not_found",
-            message: errorData.message || "Aadhaar number not found in database"
+            message: "Aadhaar number not found in database"
           };
         }
-        throw new Error(errorData.message || 'Network error');
+        throw error;
       }
-      
-      return response.json();
     },
     onSuccess: (data: StatusResult) => {
       setResult(data);
