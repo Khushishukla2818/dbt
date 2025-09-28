@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { getTranslation } from '@/lib/translations';
 
 type Language = 'en' | 'hi';
 
@@ -26,8 +27,7 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   };
 
   const t = (key: string) => {
-    // This will be handled by the translation system
-    return key;
+    return getTranslation(key, language);
   };
 
   return (
