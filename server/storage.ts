@@ -67,7 +67,11 @@ export class MemStorage implements IStorage {
 
   async createAadhaarRecord(insertRecord: InsertAadhaarRecord): Promise<AadhaarRecord> {
     const id = randomUUID();
-    const record: AadhaarRecord = { ...insertRecord, id };
+    const record: AadhaarRecord = { 
+      ...insertRecord, 
+      id,
+      dbtEnabled: insertRecord.dbtEnabled ?? false 
+    };
     this.aadhaarRecords.set(insertRecord.aadhaar, record);
     return record;
   }

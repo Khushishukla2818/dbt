@@ -6,7 +6,6 @@ import { Label } from "@/components/ui/label";
 import { useLanguage } from "@/hooks/use-language";
 import { getTranslation } from "@/lib/translations";
 import { useMutation } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 
@@ -28,7 +27,26 @@ export default function StatusChecker() {
 
   const checkStatusMutation = useMutation({
     mutationFn: async (aadhaarNumber: string) => {
-      const response = await apiRequest('POST', '/api/aadhaar/check', { aadhaar: aadhaarNumber });
+      // Use fetch directly to handle 404 properly, instead of apiRequest which throws on non-200
+      const response = await fetch('/api/aadhaar/check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ aadhaar: aadhaarNumber })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        if (response.status === 404) {
+          // Handle 404 as a valid "not found" result
+          return {
+            success: false,
+            status: "not_found",
+            message: errorData.message || "Aadhaar number not found in database"
+          };
+        }
+        throw new Error(errorData.message || 'Network error');
+      }
+      
       return response.json();
     },
     onSuccess: (data: StatusResult) => {
@@ -68,8 +86,8 @@ export default function StatusChecker() {
             <div className="flex items-center">
               <span className="text-2xl mr-3">❌</span>
               <div>
-                <h4 className="font-semibold text-destructive">Aadhaar Not Found</h4>
-                <p className="text-sm text-muted-foreground">
+                <h4 className="font-semibold text-destructive" data-testid="status-not-found-title">Aadhaar Not Found</h4>
+                <p className="text-sm text-muted-foreground" data-testid="status-not-found-message">
                   This Aadhaar number is not in our database.
                 </p>
               </div>

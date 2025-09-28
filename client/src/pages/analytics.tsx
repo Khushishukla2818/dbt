@@ -29,7 +29,7 @@ export default function Analytics() {
   });
 
   useEffect(() => {
-    if (analyticsData?.data && typeof window !== 'undefined' && window.Chart) {
+    if (analyticsData?.data && typeof window !== 'undefined') {
       initializeCharts(analyticsData.data);
     }
   }, [analyticsData]);
@@ -68,7 +68,7 @@ export default function Analytics() {
           }
         }
       });
-      setCharts(prev => ({ ...prev, pie: pieChart }));
+      setCharts((prev: any) => ({ ...prev, pie: pieChart }));
     }
 
     // Bar Chart for regional breakdown
@@ -117,7 +117,7 @@ export default function Analytics() {
           }
         }
       });
-      setCharts(prev => ({ ...prev, bar: barChart }));
+      setCharts((prev: any) => ({ ...prev, bar: barChart }));
     }
   };
 
