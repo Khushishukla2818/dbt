@@ -1,5 +1,6 @@
-import { type User, type InsertUser, type AadhaarRecord, type InsertAadhaarRecord, type QuizAttempt, type InsertQuizAttempt } from "@shared/schema";
-import { randomUUID } from "crypto";
+import { users, aadhaarRecords, quizAttempts, type User, type InsertUser, type AadhaarRecord, type InsertAadhaarRecord, type QuizAttempt, type InsertQuizAttempt } from "@shared/schema";
+import { db } from "./db";
+import { eq } from "drizzle-orm";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
@@ -14,86 +15,78 @@ export interface IStorage {
   getQuizAttempts(): Promise<QuizAttempt[]>;
 }
 
-export class MemStorage implements IStorage {
-  private users: Map<string, User>;
-  private aadhaarRecords: Map<string, AadhaarRecord>;
-  private quizAttempts: Map<string, QuizAttempt>;
-
+export class DatabaseStorage implements IStorage {
   constructor() {
-    this.users = new Map();
-    this.aadhaarRecords = new Map();
-    this.quizAttempts = new Map();
-    
-    // Initialize with sample DBT data
+    // Initialize with sample DBT data on startup
     this.initializeSampleData();
   }
 
-  private initializeSampleData() {
-    const sampleRecords = [
-      { aadhaar: "123456789012", name: "Rahul Kumar", dbtEnabled: true },
-      { aadhaar: "987654321098", name: "Anita Sharma", dbtEnabled: false },
-      { aadhaar: "555666777888", name: "Priya Singh", dbtEnabled: true },
-      { aadhaar: "444555666777", name: "Amit Patel", dbtEnabled: false },
-      { aadhaar: "333444555666", name: "Sunita Devi", dbtEnabled: true },
-    ];
+  private async initializeSampleData() {
+    try {
+      // Check if we already have data
+      const existingRecords = await this.getAllAadhaarRecords();
+      if (existingRecords.length > 0) {
+        return; // Data already exists, skip initialization
+      }
 
-    sampleRecords.forEach(record => {
-      const id = randomUUID();
-      const aadhaarRecord: AadhaarRecord = { ...record, id };
-      this.aadhaarRecords.set(record.aadhaar, aadhaarRecord);
-    });
+      // Insert sample Aadhaar records
+      const sampleRecords = [
+        { aadhaar: "123456789012", name: "Rahul Kumar", dbtEnabled: true },
+        { aadhaar: "987654321098", name: "Anita Sharma", dbtEnabled: false },
+        { aadhaar: "555666777888", name: "Priya Singh", dbtEnabled: true },
+        { aadhaar: "444555666777", name: "Amit Patel", dbtEnabled: false },
+        { aadhaar: "333444555666", name: "Sunita Devi", dbtEnabled: true },
+      ];
+
+      for (const record of sampleRecords) {
+        await db.insert(aadhaarRecords).values(record).onConflictDoNothing();
+      }
+    } catch (error) {
+      console.log("Note: Sample data initialization skipped (likely already exists)");
+    }
   }
 
   async getUser(id: string): Promise<User | undefined> {
-    return this.users.get(id);
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user || undefined;
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username,
-    );
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user || undefined;
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
-    const id = randomUUID();
-    const user: User = { ...insertUser, id };
-    this.users.set(id, user);
+    const [user] = await db.insert(users).values(insertUser).returning();
     return user;
   }
 
   async getAadhaarRecord(aadhaar: string): Promise<AadhaarRecord | undefined> {
-    return this.aadhaarRecords.get(aadhaar);
+    const [record] = await db.select().from(aadhaarRecords).where(eq(aadhaarRecords.aadhaar, aadhaar));
+    return record || undefined;
   }
 
   async createAadhaarRecord(insertRecord: InsertAadhaarRecord): Promise<AadhaarRecord> {
-    const id = randomUUID();
-    const record: AadhaarRecord = { 
-      ...insertRecord, 
-      id,
-      dbtEnabled: insertRecord.dbtEnabled ?? false 
-    };
-    this.aadhaarRecords.set(insertRecord.aadhaar, record);
+    const [record] = await db.insert(aadhaarRecords).values(insertRecord).returning();
     return record;
   }
 
   async getAllAadhaarRecords(): Promise<AadhaarRecord[]> {
-    return Array.from(this.aadhaarRecords.values());
+    return await db.select().from(aadhaarRecords);
   }
 
   async createQuizAttempt(insertAttempt: InsertQuizAttempt): Promise<QuizAttempt> {
-    const id = randomUUID();
-    const attempt: QuizAttempt = { 
-      ...insertAttempt, 
-      id,
+    const attemptWithTimestamp = {
+      ...insertAttempt,
       completedAt: new Date().toISOString()
     };
-    this.quizAttempts.set(id, attempt);
+    const [attempt] = await db.insert(quizAttempts).values(attemptWithTimestamp).returning();
     return attempt;
   }
 
   async getQuizAttempts(): Promise<QuizAttempt[]> {
-    return Array.from(this.quizAttempts.values());
+    return await db.select().from(quizAttempts);
   }
 }
 
-export const storage = new MemStorage();
+export const storage = new DatabaseStorage();
